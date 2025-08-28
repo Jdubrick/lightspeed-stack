@@ -1,7 +1,8 @@
 """Model with service configuration."""
 
+import logging
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from enum import Enum
 
 import jsonpath_ng
@@ -15,11 +16,15 @@ from pydantic import (
     AnyHttpUrl,
     PositiveInt,
 )
+
+from pydantic.dataclasses import dataclass
 from typing_extensions import Self, Literal
 
 import constants
 
 from utils import checks
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigurationBase(BaseModel):
@@ -384,17 +389,44 @@ class AuthenticationConfiguration(ConfigurationBase):
         return self.jwk_config
 
 
+@dataclass
+class CustomProfile:
+    """Custom profile customization for prompts and validation."""
+
+    path: str
+    prompts: Dict[str, str] = Field(default={}, init=False)
+
+    def __post_init__(self) -> None:
+        """Validate and load profile."""
+        self._validate_and_process()
+
+    def _validate_and_process(self) -> None:
+        """Validate and load the profile."""
+        checks.file_check(Path(self.path), "custom profile")
+        profile_module = checks.import_python_module("profile", self.path)
+        if profile_module is not None and checks.is_valid_profile(profile_module):
+            self.prompts = profile_module.PROFILE_CONFIG.get("system_prompts", {})
+
+    def get_prompts(self) -> Dict[str, str]:
+        """Retrieve prompt attribute."""
+        return self.prompts
+
+
 class Customization(ConfigurationBase):
     """Service customization."""
 
+    profile_path: Optional[str] = None
     disable_query_system_prompt: bool = False
     system_prompt_path: Optional[FilePath] = None
     system_prompt: Optional[str] = None
+    custom_profile: Optional[CustomProfile] = Field(default=None, init=False)
 
     @model_validator(mode="after")
     def check_customization_model(self) -> Self:
-        """Load system prompt from file."""
-        if self.system_prompt_path is not None:
+        """Load customizations."""
+        if self.profile_path:
+            self.custom_profile = CustomProfile(path=self.profile_path)
+        elif self.system_prompt_path is not None:
             checks.file_check(self.system_prompt_path, "system prompt")
             self.system_prompt = checks.get_attribute_from_file(
                 dict(self), "system_prompt_path"
