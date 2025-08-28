@@ -1,6 +1,5 @@
 """Model with service configuration."""
 
-import logging
 from pathlib import Path
 from typing import Optional, Any, Dict
 from enum import Enum
@@ -23,8 +22,6 @@ from typing_extensions import Self, Literal
 import constants
 
 from utils import checks
-
-logger = logging.getLogger(__name__)
 
 
 class ConfigurationBase(BaseModel):
