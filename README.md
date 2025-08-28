@@ -366,11 +366,11 @@ customization:
 
 #### Custom Profile
 
-If you have added a custom profile specification to `/src/utils/profiles` and it exposes prompts you can set them with:
+You can pass a custom prompt profile via it's `path` to the customization:
 
 ```yaml
 customization:
-  profile_name: <your-profile>
+  profile_path: <your/profile/path>
 ```
 
 Additionally, an optional string parameter `system_prompt` can be specified in `/v1/query` and `/v1/streaming_query` endpoints to override the configured system prompt. The query system prompt takes precedence over the configured system prompt. You can use this config to disable query system prompts:
