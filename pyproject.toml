@@ -70,6 +70,7 @@ dependencies = [
     "pyasn1>=0.6.3", # LCORE-1490
     # Used for system prompt template variable rendering
     "jinja2>=3.1.0",
+    "lightspeed_stack_providers==0.5.0",
 ]
 
 
