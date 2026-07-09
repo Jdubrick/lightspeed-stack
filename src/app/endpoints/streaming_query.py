@@ -42,6 +42,7 @@ from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.azure_token_manager import AzureEntraIDManager
 from authorization.middleware import authorize
+from authorization.oauth_token_manager import get_oauth_manager
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from constants import (
@@ -282,6 +283,15 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         and AzureEntraIDManager().refresh_token()
     ):
         client = await AsyncLlamaStackClientHolder().update_azure_token()
+
+    # POC ONLY: OAuth token refresh for oauth-configured providers (do not commit).
+    oauth_provider_id, _ = extract_provider_and_model_from_model_id(
+        responses_params.model
+    )
+    oauth_manager = get_oauth_manager(oauth_provider_id)
+    if oauth_manager and oauth_manager.is_token_expired:
+        if await oauth_manager.refresh_token():
+            AsyncLlamaStackClientHolder().update_oauth_provider_data(oauth_provider_id)
 
     request_id = get_suid()
 

@@ -654,6 +654,41 @@ class ModelContextProtocolServer(ConfigurationBase):
         return self
 
 
+class OAuthConfiguration(ConfigurationBase):
+    """OAuth2 client credentials configuration for inference providers.
+
+    POC ONLY — do not commit. Used to fetch and refresh short-lived access
+    tokens for providers behind an OAuth2 gateway (e.g. vLLM behind Envoy).
+    """
+
+    token_url: AnyHttpUrl = Field(
+        ...,
+        title="Token URL",
+        description="OAuth2 token endpoint URL for the client_credentials grant.",
+    )
+    client_id: SecretStr = Field(
+        ...,
+        title="Client ID",
+        description="OAuth2 client identifier.",
+    )
+    client_secret: SecretStr = Field(
+        ...,
+        title="Client secret",
+        description="OAuth2 client secret.",
+    )
+    scope: Optional[str] = Field(
+        None,
+        title="Token scope",
+        description="Optional OAuth2 scope requested with the token.",
+    )
+    token_expiration_leeway: PositiveInt = Field(
+        30,
+        title="Token expiration leeway",
+        description="Seconds before actual expiry at which the token is "
+        "treated as expired and refreshed.",
+    )
+
+
 class UnifiedInferenceProvider(ConfigurationBase):
     """A high-level inference provider entry for unified-mode synthesis.
 
@@ -675,6 +710,9 @@ class UnifiedInferenceProvider(ConfigurationBase):
         extra: Additional provider-config keys merged verbatim into the
             synthesized provider's `config` block — an escape hatch for
             provider-specific knobs not modeled here.
+        oauth: Optional OAuth2 client-credentials config. When set, LCS fetches
+            and refreshes access tokens instead of using a static api_key_env.
+            POC ONLY — do not commit.
     """
 
     type: Literal[
@@ -713,6 +751,13 @@ class UnifiedInferenceProvider(ConfigurationBase):
         title="Extra provider config",
         description="Additional provider-config keys merged verbatim into the "
         "synthesized provider's config block.",
+    )
+
+    oauth: Optional[OAuthConfiguration] = Field(
+        None,
+        title="OAuth2 configuration",
+        description="Optional OAuth2 client-credentials config for dynamic "
+        "token fetch/refresh. POC ONLY — do not commit.",
     )
 
 

@@ -1,0 +1,8 @@
+# POC ONLY — do not commit.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oauth-poc
+  labels:
+    app.kubernetes.io/part-of: oauth-poc
+    app.kubernetes.io/component: namespace

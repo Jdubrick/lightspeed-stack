@@ -9,6 +9,7 @@ from llama_stack_client import APIConnectionError
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
+from authorization.oauth_token_manager import get_all_oauth_managers
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from log import get_logger
@@ -120,6 +121,15 @@ async def models_endpoint_handler(
 
     llama_stack_configuration = configuration.llama_stack_configuration
     logger.info("Llama stack config: %s", llama_stack_configuration)
+
+    # POC ONLY: refresh expired OAuth tokens before listing models (do not commit).
+    # /v1/models is not tied to a single provider, so refresh every registered manager.
+    for oauth_manager in get_all_oauth_managers():
+        if oauth_manager.is_token_expired:
+            if await oauth_manager.refresh_token():
+                AsyncLlamaStackClientHolder().update_oauth_provider_data(
+                    oauth_manager.provider_id
+                )
 
     try:
         # try to get Llama Stack client

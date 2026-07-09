@@ -1,0 +1,147 @@
+# POC ONLY — do not commit.
+# Ollama model server. Auto-pulls mistral:7b on startup; PVC caches the model.
+#
+# OpenShift note: pods run as a random non-root UID, so HOME must point at a
+# writable volume. Do not mount under /root — that path is not writable.
+# Namespace enforces Pod Security "restricted", so securityContext must match.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-data
+  namespace: oauth-poc
+  labels:
+    app: ollama
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-entrypoint
+  namespace: oauth-poc
+  labels:
+    app: ollama
+data:
+  entrypoint.sh: |
+    #!/bin/sh
+    set -eu
+    # Ensure Ollama's data dir exists on the mounted volume (HOME=/ollama).
+    mkdir -p "${HOME}/.ollama"
+
+    echo "Starting Ollama server (HOME=${HOME})..."
+    ollama serve &
+    OLLAMA_PID=$!
+
+    echo "Waiting for Ollama to become ready..."
+    for i in $(seq 1 60); do
+      if ollama list >/dev/null 2>&1; then
+        break
+      fi
+      sleep 2
+    done
+
+    MODEL="${OLLAMA_MODEL:-mistral:7b}"
+    if ollama list | grep -q "^${MODEL%%:*}"; then
+      echo "Model ${MODEL} already present"
+    else
+      echo "Pulling model ${MODEL} (this may take several minutes)..."
+      ollama pull "${MODEL}"
+      echo "Model ${MODEL} pull complete"
+    fi
+
+    wait "${OLLAMA_PID}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: oauth-poc
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      # Do NOT hardcode fsGroup — restricted-v2 rejects fixed GIDs like 1000.
+      # OpenShift injects an allowed fsGroup from the namespace range.
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ollama
+          image: docker.io/ollama/ollama:latest
+          command:
+            - /bin/sh
+            - /entrypoint/entrypoint.sh
+          env:
+            # Critical for OCP: without this, Ollama tries /.ollama and fails.
+            - name: HOME
+              value: /ollama
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:11434"
+            - name: OLLAMA_MODEL
+              value: mistral:7b
+          ports:
+            - name: http
+              containerPort: 11434
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          volumeMounts:
+            - name: data
+              mountPath: /ollama
+            - name: entrypoint
+              mountPath: /entrypoint
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ollama-data
+        - name: entrypoint
+          configMap:
+            name: ollama-entrypoint
+            defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: oauth-poc
+  labels:
+    app: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http

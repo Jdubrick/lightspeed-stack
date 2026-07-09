@@ -1,0 +1,46 @@
+# POC ONLY — do not commit.
+# Example Lightspeed Core Stack config for OAuth2 token refresh testing.
+# Requires: Keycloak + Envoy + Ollama deployed on OCP, with port-forwards:
+#   oc port-forward -n oauth-poc svc/envoy-gateway 8081:8080
+#   oc port-forward -n oauth-poc svc/keycloak 8082:8080
+name: Lightspeed Core Stack (OAuth POC)
+service:
+  host: 0.0.0.0
+  port: 8080
+  auth_enabled: false
+  workers: 1
+  color_log: true
+  access_log: true
+
+llama_stack:
+  use_as_library_client: true
+  config:
+    baseline: default
+
+user_data_collection:
+  feedback_enabled: false
+  transcripts_enabled: false
+
+authentication:
+  module: "noop"
+
+conversation_cache:
+  type: "sqlite"
+  sqlite:
+    db_path: "/tmp/data/conversation-cache-oauth-poc.db"
+
+inference:
+  default_provider: vllm
+  default_model: mistral:7b
+  providers:
+    - type: vllm
+      # Ollama OpenAI-compatible API is under /v1 behind Envoy
+      extra:
+        base_url: http://localhost:8081/v1
+      oauth:
+        token_url: http://localhost:8082/realms/poc/protocol/openid-connect/token
+        client_id: lcs-client
+        client_secret: poc-secret
+        # Optional; omit if Keycloak rejects the custom scope
+        # scope: "inference"
+        token_expiration_leeway: 10

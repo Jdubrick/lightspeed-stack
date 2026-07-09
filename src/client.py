@@ -273,6 +273,52 @@ class AsyncLlamaStackClientHolder(metaclass=Singleton):
         )
         return False, f"Model {model_id} not found in model registry"
 
+    def update_oauth_provider_data(self, provider_id: str) -> None:
+        """Mutate provider_data on the held library client with a fresh OAuth token.
+
+        POC ONLY — do not commit. Unlike update_azure_token(), this does not
+        recreate the library client; the next request picks up the updated
+        provider_data via the library client's ContextVar injection.
+
+        Parameters:
+            provider_id: Synthesized provider id (e.g. ``vllm``).
+        """
+        # Local import to avoid circular imports at module load.
+        from authorization.oauth_token_manager import get_oauth_manager
+
+        manager = get_oauth_manager(provider_id)
+        if not manager:
+            logger.warning(
+                "No OAuthTokenManager registered for provider_id=%s", provider_id
+            )
+            return
+
+        updates = manager.build_provider_data()
+        if not updates:
+            logger.warning(
+                "OAuthTokenManager for provider_id=%s has no cached token",
+                provider_id,
+            )
+            return
+
+        if not self.is_library_client:
+            logger.warning(
+                "update_oauth_provider_data is library-mode only; "
+                "ignoring for provider_id=%s",
+                provider_id,
+            )
+            return
+
+        client = cast(AsyncLlamaStackAsLibraryClient, self._lsc)
+        if client.provider_data is None:
+            client.provider_data = {}
+        client.provider_data.update(updates)
+        logger.info(
+            "Updated provider_data for provider_id=%s with keys=%s",
+            provider_id,
+            list(updates.keys()),
+        )
+
     async def update_azure_token(self) -> AsyncLlamaStackClient:
         """Apply cached Azure credentials and replace the held client.
 

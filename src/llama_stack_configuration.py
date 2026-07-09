@@ -753,7 +753,13 @@ def apply_high_level_inference(
         provider_config: dict[str, Any] = {}
         if provider.get("extra"):
             provider_config.update(provider["extra"])
-        if provider.get("api_key_env"):
+        # POC ONLY: when oauth is configured, emit an auto-generated env var
+        # that LCS sets after prefetching the token (do not commit).
+        if provider.get("oauth"):
+            env_var_name = f"_LCS_OAUTH_{provider_type.upper()}_TOKEN"
+            key_field = API_KEY_FIELD_MAP.get(ls_provider_type, "api_key")
+            provider_config[key_field] = "${env." + env_var_name + "}"
+        elif provider.get("api_key_env"):
             key_field = API_KEY_FIELD_MAP.get(ls_provider_type, "api_key")
             provider_config[key_field] = "${env." + provider["api_key_env"] + "}"
         if provider.get("allowed_models"):

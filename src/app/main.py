@@ -19,6 +19,7 @@ from app import routers
 from app.database import create_tables, initialize_database
 from app.endpoints.streaming_query import shutdown_background_topic_summary_tasks
 from authorization.azure_token_manager import AzureEntraIDManager
+from authorization.oauth_token_manager import prefetch_oauth_tokens
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from log import get_logger
@@ -82,6 +83,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configuration.load_configuration(os.environ["LIGHTSPEED_STACK_CONFIG_PATH"])
 
     initialize_sentry()
+
+    # POC ONLY: prefetch OAuth tokens before Llama Stack init (do not commit).
+    await prefetch_oauth_tokens(configuration.configuration)
 
     llama_stack_config = configuration.configuration.llama_stack
     await AsyncLlamaStackClientHolder().load(llama_stack_config)
