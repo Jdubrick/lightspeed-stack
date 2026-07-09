@@ -40,7 +40,7 @@ logger = get_logger(__name__)
 # a unit test so a new Literal value cannot be added without a mapping.
 PROVIDER_TYPE_MAP: dict[str, str] = {
     "openai": "remote::openai",
-    "ollama": "remote::ollama",
+    "ollama": "remote::vllm",
     "vllm": "remote::vllm",
     "sentence_transformers": "inline::sentence-transformers",
     "azure": "remote::azure",

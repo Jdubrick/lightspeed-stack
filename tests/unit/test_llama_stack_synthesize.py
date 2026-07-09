@@ -187,7 +187,7 @@ def test_apply_high_level_inference_emits_api_token_for_vllm() -> None:
 
 
 def test_apply_high_level_inference_maps_ollama() -> None:
-    """ollama maps to remote::ollama with extra config merged."""
+    """ollama maps to remote::vllm with extra config merged."""
     ls_config: dict[str, Any] = {"providers": {"inference": []}}
     inference = {
         "providers": [
@@ -197,7 +197,7 @@ def test_apply_high_level_inference_maps_ollama() -> None:
     apply_high_level_inference(ls_config, inference)
     entry = ls_config["providers"]["inference"][0]
     assert entry["provider_id"] == "ollama"
-    assert entry["provider_type"] == "remote::ollama"
+    assert entry["provider_type"] == "remote::vllm"
     assert entry["config"]["base_url"] == "http://localhost:11434"
 
 
